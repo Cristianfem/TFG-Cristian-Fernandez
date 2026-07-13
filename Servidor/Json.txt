@@ -1,0 +1,104 @@
+var chirpstack_payload = msg.payload;
+
+if (!chirpstack_payload.data) {
+    return null;
+}
+
+// Convertimos la carga útil de base64 a un buffer de bytes
+var buffer;
+try {
+    buffer = Buffer.from(chirpstack_payload.data, 'base64');
+} catch (e) {
+    return null;
+}
+
+var payload_obj = {};
+
+// ------------------------------------------------------------------
+// CASO 1: PAQUETE BINARIO (Sensores, INA, PMU unificados) -> 14 Bytes
+// ------------------------------------------------------------------
+if (buffer.length === 14) {
+    // Función auxiliar para leer enteros de 16 bits con signo (Complemento a 2)
+    function readInt16(byte1, byte2) {
+        var val = (byte1 << 8) | byte2;
+        return val > 0x7FFF ? val - 0x10000 : val;
+    }
+
+    // Decodificación aplicando la escala inversa usada en el ESP32
+    payload_obj.sht31_temp = readInt16(buffer[0], buffer[1]) / 100.0;
+    payload_obj.sht31_hum = ((buffer[2] << 8) | buffer[3]) / 10.0;
+    payload_obj.ds_temp = readInt16(buffer[4], buffer[5]) / 100.0;
+    payload_obj.irradiance = ((buffer[6] << 8) | buffer[7]) / 10.0;
+
+    payload_obj.ina_voltage = ((buffer[8] << 8) | buffer[9]) / 100.0;
+    payload_obj.ina_current_mA = readInt16(buffer[10], buffer[11]) / 10.0;
+
+    // Potencia calculada en el servidor (Node-RED)
+    payload_obj.ina_power_mW = Math.round(payload_obj.ina_voltage * payload_obj.ina_current_mA * 100) / 100;
+
+    payload_obj.pmu_batt_percent = buffer[12];
+
+    // Decodificar máscara de bits (Byte 13)
+    payload_obj.system_status = buffer[13] & 0x0F;            // Bits 0-3
+    payload_obj.pmu_charging = (buffer[13] & 0x10) > 0 ? 1 : 0; // Bit 4
+
+    msg.payload = payload_obj;
+    return msg;
+}
+
+// ------------------------------------------------------------------
+// CASO 2: PAQUETE DE TEXTO (Mensajes de GPS o Errores)
+// ------------------------------------------------------------------
+else {
+    var data_string = buffer.toString('utf8');
+    var parts = data_string.split('_');
+
+    if (parts.length < 2) {
+        return null; // Formato de texto desconocido
+    }
+
+    var prefix = parts[0];
+    var data = parts[1];
+
+    if (prefix === "GPS1") {
+        var pairs = data.split(',');
+        for (var i = 0; i < pairs.length; i++) {
+            var kv = pairs[i].split(':');
+            if (kv.length !== 2) continue;
+
+            var key = kv[0];
+            var value = parseFloat(kv[1]);
+
+            if (isNaN(value)) continue;
+
+            if (key === "la") payload_obj.gps_latitude = value;
+            else if (key === "lo") payload_obj.gps_longitude = value;
+            else if (key === "D") payload_obj.gps_date_raw = value;
+            else if (key === "T") payload_obj.gps_time_raw = value;
+            else if (key === "st") payload_obj.system_status = Number(value);
+        }
+    }
+    else if (prefix === "ERR") { // Por si entra en ErrorMode()
+        var pairs = data.split(',');
+        for (var i = 0; i < pairs.length; i++) {
+            var kv = pairs[i].split(':');
+            if (kv.length !== 2) continue;
+            var key = kv[0];
+            var value = parseFloat(kv[1]);
+
+            if (key === "V") payload_obj.ina_voltage = value;
+            else if (key === "I") payload_obj.ina_current_mA = value;
+        }
+        payload_obj.system_status = 0; // Forzamos status 0 en error
+    }
+    else {
+        return null; // Prefijo no esperado
+    }
+
+    if (Object.keys(payload_obj).length === 0) {
+        return null;
+    }
+
+    msg.payload = payload_obj;
+    return msg;
+}
