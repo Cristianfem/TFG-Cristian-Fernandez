@@ -11,14 +11,14 @@
 #include "LoRaBoards.h"
 #include "lmic.h"
 
-// --- Configuración de Pines ---
+// Configuración de Pines 
 #define ONE_WIRE_BUS 15
 
 #define GPS_RX_PIN 34
 #define GPS_TX_PIN 12
 #define GPS_BAUDRATE 9600
 
-// --- Tiempos y Umbrales ---
+// Tiempos y Umbrales 
 const long interval_tx_active = 5 * 60 * 1000; // 5 minutos entre envíos cuando está cargando
 const int sleepMinutes = 15;                   // 15 min de sueño si está en modo ahorro (sin carga)
 
@@ -26,11 +26,11 @@ const int sleepMinutes = 15;                   // 15 min de sueño si está en m
 const float irradiance_limit = 1.0; 
 const float K_LUX_A_W_M2 = 100;
 
-// --- Lógica de Sueño Nocturno Incremental ---
+// Lógica de Sueño Nocturno Incremental
 const int nightSleepIntervals[] = {5, 15, 30}; // Tiempos escalonados en minutos
 RTC_DATA_ATTR int nightSleepIndex = 0;             // Índice guardado en memoria persistente
 
-// --- Objetos ---
+// Objetos
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 Adafruit_VEML7700 veml = Adafruit_VEML7700();
 OneWire oneWire(ONE_WIRE_BUS);
@@ -121,9 +121,9 @@ void setupSensors() {
     Serial.println(F("------------------------------"));
 }
 
-// =========================================================================
-// NUEVA FUNCIÓN MAESTRA: Envía TODOS los datos en formato binario (14 bytes)
-// =========================================================================
+
+// Envía todos los datos en formato binario (14 bytes)
+
 void sendAllData() {
     if (LMIC.opmode & OP_TXRXPEND) {
         Serial.println("Radio ocupada, envío cancelado.");
@@ -153,7 +153,7 @@ void sendAllData() {
     state = CheckState();
     if (state == 2 && Signal == true) state = 1;
 
-    // --- CONSTRUCCIÓN DEL PAYLOAD (14 BYTES) ---
+    //  Construcción del payload (14 BYTES) 
     uint8_t payload[14];
 
     int16_t t_sht_int = round(temp_sht * 100);
@@ -248,11 +248,11 @@ void NightMode() {
     isFirstSendOfDay = true;
     waitforLora(); 
     
-    // ----------------------------------------------------
-    // NUEVO: Enviamos el paquete de datos antes de dormir
+    
+    // Enviamos el paquete de datos antes de dormir
     sendAllData(); 
-    waitforLora(); // Crítico: esperar a que la radio termine antes de cortar la energía
-    // ----------------------------------------------------
+    waitforLora(); // esperar a que la radio termine antes de cortar la energía
+    
 
     // Obtenemos los minutos del array según el índice actual
     int minsToSleep = nightSleepIntervals[nightSleepIndex];
@@ -396,7 +396,7 @@ void loop() {
     float lux = veml.readLux();
     float irradiancia = calculateIrradiance(lux);
     
-    // COMPROBACIÓN DE MODO NOCHE / DÍA
+    // Comprobación de modo noche/día
     if (irradiancia <= irradiance_limit) {
         Serial.print("Irradiancia baja: "); Serial.print(irradiancia); Serial.println(" W/m^2");
         NightMode();
