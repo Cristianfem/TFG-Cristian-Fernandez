@@ -1,4 +1,4 @@
-# TFG-Cristian-Fernandez
+# TFG-Cristian-Fernández
 # Implementación de un Nodo de Telemetría Inalámbrica para Instalaciones Fotovoltaicas
 
 Repositorio oficial del Trabajo de Fin de Grado (TFG) desarrollado para el Grado en Ingeniería de Tecnologías Industriales en la Universidad Rey Juan Carlos (URJC).
